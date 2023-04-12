@@ -15,7 +15,8 @@ import (
 const BaseURL = "https://mock-api.carta.com/v1alpha1/"
 const InvestorsBaseURL = BaseURL + "investors/firms"
 const IssuersBaseURL = BaseURL + "issuers"
-const PortfolioBaseURL = BaseURL + "portfolios"
+const PortfoliosBaseURL = BaseURL + "portfolios"
+const PortfoliosIssuersBaseURL = PortfoliosBaseURL + "/%s/issuers"
 
 type Client struct {
 	httpClient  *http.Client
@@ -23,6 +24,16 @@ type Client struct {
 }
 
 type IssuerResponse struct {
+	Issuers []Issuer `json:"issuers"`
+	PaginationData
+}
+
+type PortfolioResponse struct {
+	Portfolios []Portfolio `json:"portfolios"`
+	PaginationData
+}
+
+type PortfolioIssuerResponse struct {
 	Issuers []Issuer `json:"issuers"`
 	PaginationData
 }
@@ -80,6 +91,83 @@ func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams)
 	}
 
 	return userResponse.Issuers, "", nil
+}
+
+// GetPortfolios returns all portfolios (groupings of issuers) accessible to the user or investor.
+func (c *Client) GetPortfolios(ctx context.Context, getPortfolioVars PaginationParams) ([]Portfolio, string, error) {
+	queryParams := setupPaginationQuery(url.Values{}, getPortfolioVars.Size, getPortfolioVars.After)
+	var portfolioResponse PortfolioResponse
+
+	err := c.doRequest(
+		ctx,
+		PortfoliosBaseURL,
+		&portfolioResponse,
+		queryParams,
+	)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	// get all issuers for each portfolio
+	for i, portfolio := range portfolioResponse.Portfolios {
+		var issuers []Issuer
+		var next string
+
+		// get issuers for portfolio ( loop until all issuers are retrieved )
+		for {
+			issuersForPortfolio, nextToken, err := c.GetIssuersForPortfolio(
+				ctx,
+				portfolio.Id,
+				PaginationParams{Size: 100, After: next},
+			)
+
+			if err != nil {
+				return nil, "", err
+			}
+
+			issuers = append(issuers, issuersForPortfolio...)
+
+			if nextToken == "" {
+				break
+			}
+
+			next = nextToken
+		}
+
+		portfolioResponse.Portfolios[i].Issuers = issuers
+	}
+
+	// check for duplicates to prevent infinite loop (this can happen with mock data)
+	if getPortfolioVars.After != portfolioResponse.Next && portfolioResponse.Next != "" {
+		return portfolioResponse.Portfolios, portfolioResponse.Next, nil
+	}
+
+	return portfolioResponse.Portfolios, "", nil
+}
+
+// GetIssuersForPortfolio returns all issuers (companies to invest in) under specific portfolio.
+func (c *Client) GetIssuersForPortfolio(ctx context.Context, portfolioId string, getIssuerVars PaginationParams) ([]Issuer, string, error) {
+	queryParams := setupPaginationQuery(url.Values{}, getIssuerVars.Size, getIssuerVars.After)
+	var issuerReponse PortfolioIssuerResponse
+
+	err := c.doRequest(
+		ctx,
+		fmt.Sprintf(PortfoliosIssuersBaseURL, portfolioId),
+		&issuerReponse,
+		queryParams,
+	)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	// check for duplicates to prevent infinite loop (this can happen with mock data)
+	if getIssuerVars.After != issuerReponse.Next && issuerReponse.Next != "" {
+		return issuerReponse.Issuers, issuerReponse.Next, nil
+	}
+
+	return issuerReponse.Issuers, "", nil
 }
 
 // GetInvestors returns all investor firms accessible to the user.

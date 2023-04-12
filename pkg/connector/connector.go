@@ -19,6 +19,13 @@ var (
 			v2.ResourceType_TRAIT_USER,
 		},
 	}
+	resourceTypePortfolio = &v2.ResourceType{
+		Id:          "portfolio",
+		DisplayName: "Portfolio",
+		Traits: []v2.ResourceType_Trait{
+			v2.ResourceType_TRAIT_GROUP,
+		},
+	}
 	resourceTypeInvestor = &v2.ResourceType{
 		Id:          "investor",
 		DisplayName: "Investor",
@@ -35,6 +42,7 @@ type Carta struct {
 func (c *Carta) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
 	return []connectorbuilder.ResourceSyncer{
 		issuerBuilder(c.client),
+		portfolioBuilder(c.client),
 		investorBuilder(c.client),
 	}
 }

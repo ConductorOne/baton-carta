@@ -10,6 +10,12 @@ type Issuer struct {
 	Website string `json:"website"`
 }
 
+type Portfolio struct {
+	Id      string `json:"portfolioId"`
+	Name    string `json:"legalName"`
+	Issuers []Issuer
+}
+
 type InvestorFirm struct {
 	BaseResource
 	Name string `json:"name"`
