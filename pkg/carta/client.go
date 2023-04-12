@@ -15,6 +15,7 @@ import (
 const BaseURL = "https://mock-api.carta.com/v1alpha1/"
 const InvestorsBaseURL = BaseURL + "investors/firms"
 const IssuersBaseURL = BaseURL + "issuers"
+const IssuerBaseURL = IssuersBaseURL + "/%s"
 const PortfoliosBaseURL = BaseURL + "portfolios"
 const PortfoliosIssuersBaseURL = PortfoliosBaseURL + "/%s/issuers"
 
@@ -24,6 +25,10 @@ type Client struct {
 }
 
 type IssuerResponse struct {
+	Issuer Issuer `json:"issuer"`
+}
+
+type IssuersResponse struct {
 	Issuers []Issuer `json:"issuers"`
 	PaginationData
 }
@@ -72,7 +77,7 @@ func setupPaginationQuery(query url.Values, size int, after string) url.Values {
 // GetIssuers returns all issuers (companies to invest in) accessible to the user or investor.
 func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams) ([]Issuer, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getIssuerVars.Size, getIssuerVars.After)
-	var userResponse IssuerResponse
+	var userResponse IssuersResponse
 
 	err := c.doRequest(
 		ctx,
@@ -91,6 +96,24 @@ func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams)
 	}
 
 	return userResponse.Issuers, "", nil
+}
+
+// GetIssuer returns specific issuer based on provided id, accessible to the user or investor.
+func (c *Client) GetIssuer(ctx context.Context, issuerId string) (Issuer, error) {
+	var issuerResponse IssuerResponse
+
+	err := c.doRequest(
+		ctx,
+		fmt.Sprintf(IssuerBaseURL, issuerId),
+		&issuerResponse,
+		nil,
+	)
+
+	if err != nil {
+		return Issuer{}, err
+	}
+
+	return issuerResponse.Issuer, nil
 }
 
 // GetPortfolios returns all portfolios (groupings of issuers) accessible to the user or investor.

@@ -9,8 +9,12 @@ import (
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
+	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
+	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
+
+const memberEntitlement = "member"
 
 type portfolioResourceType struct {
 	resourceType *v2.ResourceType
@@ -82,11 +86,61 @@ func (o *portfolioResourceType) List(ctx context.Context, parentId *v2.ResourceI
 }
 
 func (o *portfolioResourceType) Entitlements(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+	var rv []*v2.Entitlement
+	assignmentOptions := []ent.EntitlementOption{
+		ent.WithGrantableTo(resourceTypeIssuer),
+		ent.WithDisplayName(fmt.Sprintf("%s Portfolio %s", resource.DisplayName, memberEntitlement)),
+		ent.WithDescription(fmt.Sprintf("Access to %s portfolio in Carta", resource.DisplayName)),
+	}
+
+	// create membership entitlement
+	rv = append(rv, ent.NewAssignmentEntitlement(
+		resource,
+		memberEntitlement,
+		assignmentOptions...,
+	))
+
+	return rv, "", nil, nil
 }
 
 func (o *portfolioResourceType) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+	portfolioTrait, err := rs.GetGroupTrait(resource)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	issuerIdsString, ok := rs.GetProfileStringValue(portfolioTrait.Profile, "portfolio_issuer_ids")
+	if !ok {
+		return nil, "", nil, fmt.Errorf("error fetching issuer ids from portfolio profile")
+	}
+
+	issuerIds := strings.Split(issuerIdsString, ",")
+
+	// create membership grants
+	var rv []*v2.Grant
+	for _, id := range issuerIds {
+		issuer, err := o.client.GetIssuer(ctx, id)
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		issuerCopy := issuer
+		ir, err := issuerResource(ctx, &issuerCopy, nil)
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		rv = append(
+			rv,
+			grant.NewGrant(
+				resource,
+				memberEntitlement,
+				ir.Id,
+			),
+		)
+	}
+
+	return rv, "", nil, nil
 }
 
 func portfolioBuilder(client *carta.Client) *portfolioResourceType {
