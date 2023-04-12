@@ -58,6 +58,30 @@ func setupPaginationQuery(query url.Values, size int, after string) url.Values {
 	return query
 }
 
+// GetIssuers returns all issuers (companies to invest in) accessible to the user or investor.
+func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams) ([]Issuer, string, error) {
+	queryParams := setupPaginationQuery(url.Values{}, getIssuerVars.Size, getIssuerVars.After)
+	var userResponse IssuerResponse
+
+	err := c.doRequest(
+		ctx,
+		IssuersBaseURL,
+		&userResponse,
+		queryParams,
+	)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	// check for duplicates to prevent infinite loop (this can happen with mock data)
+	if getIssuerVars.After != userResponse.Next && userResponse.Next != "" {
+		return userResponse.Issuers, userResponse.Next, nil
+	}
+
+	return userResponse.Issuers, "", nil
+}
+
 // GetInvestors returns all investor firms accessible to the user.
 func (c *Client) GetInvestors(ctx context.Context, getInvestorVars PaginationParams) ([]InvestorFirm, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getInvestorVars.Size, getInvestorVars.After)
