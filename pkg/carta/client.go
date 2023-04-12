@@ -33,17 +33,17 @@ type IssuersResponse struct {
 	PaginationData
 }
 
-type PortfolioResponse struct {
+type PortfoliosResponse struct {
 	Portfolios []Portfolio `json:"portfolios"`
 	PaginationData
 }
 
-type PortfolioIssuerResponse struct {
+type PortfoliosIssuersResponse struct {
 	Issuers []Issuer `json:"issuers"`
 	PaginationData
 }
 
-type InvestorResponse struct {
+type InvestorsResponse struct {
 	Firms []InvestorFirm `json:"firms"`
 	PaginationData
 }
@@ -77,12 +77,12 @@ func setupPaginationQuery(query url.Values, size int, after string) url.Values {
 // GetIssuers returns all issuers (companies to invest in) accessible to the user or investor.
 func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams) ([]Issuer, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getIssuerVars.Size, getIssuerVars.After)
-	var userResponse IssuersResponse
+	var issuersResponse IssuersResponse
 
 	err := c.doRequest(
 		ctx,
 		IssuersBaseURL,
-		&userResponse,
+		&issuersResponse,
 		queryParams,
 	)
 
@@ -91,11 +91,11 @@ func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams)
 	}
 
 	// check for duplicates to prevent infinite loop (this can happen with mock data)
-	if getIssuerVars.After != userResponse.Next && userResponse.Next != "" {
-		return userResponse.Issuers, userResponse.Next, nil
+	if getIssuerVars.After != issuersResponse.Next && issuersResponse.Next != "" {
+		return issuersResponse.Issuers, issuersResponse.Next, nil
 	}
 
-	return userResponse.Issuers, "", nil
+	return issuersResponse.Issuers, "", nil
 }
 
 // GetIssuer returns specific issuer based on provided id, accessible to the user or investor.
@@ -119,12 +119,12 @@ func (c *Client) GetIssuer(ctx context.Context, issuerId string) (Issuer, error)
 // GetPortfolios returns all portfolios (groupings of issuers) accessible to the user or investor.
 func (c *Client) GetPortfolios(ctx context.Context, getPortfolioVars PaginationParams) ([]Portfolio, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getPortfolioVars.Size, getPortfolioVars.After)
-	var portfolioResponse PortfolioResponse
+	var portfoliosResponse PortfoliosResponse
 
 	err := c.doRequest(
 		ctx,
 		PortfoliosBaseURL,
-		&portfolioResponse,
+		&portfoliosResponse,
 		queryParams,
 	)
 
@@ -133,7 +133,7 @@ func (c *Client) GetPortfolios(ctx context.Context, getPortfolioVars PaginationP
 	}
 
 	// get all issuers for each portfolio
-	for i, portfolio := range portfolioResponse.Portfolios {
+	for i, portfolio := range portfoliosResponse.Portfolios {
 		var issuers []Issuer
 		var next string
 
@@ -158,26 +158,26 @@ func (c *Client) GetPortfolios(ctx context.Context, getPortfolioVars PaginationP
 			next = nextToken
 		}
 
-		portfolioResponse.Portfolios[i].Issuers = issuers
+		portfoliosResponse.Portfolios[i].Issuers = issuers
 	}
 
 	// check for duplicates to prevent infinite loop (this can happen with mock data)
-	if getPortfolioVars.After != portfolioResponse.Next && portfolioResponse.Next != "" {
-		return portfolioResponse.Portfolios, portfolioResponse.Next, nil
+	if getPortfolioVars.After != portfoliosResponse.Next && portfoliosResponse.Next != "" {
+		return portfoliosResponse.Portfolios, portfoliosResponse.Next, nil
 	}
 
-	return portfolioResponse.Portfolios, "", nil
+	return portfoliosResponse.Portfolios, "", nil
 }
 
 // GetIssuersForPortfolio returns all issuers (companies to invest in) under specific portfolio.
 func (c *Client) GetIssuersForPortfolio(ctx context.Context, portfolioId string, getIssuerVars PaginationParams) ([]Issuer, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getIssuerVars.Size, getIssuerVars.After)
-	var issuerReponse PortfolioIssuerResponse
+	var issuersReponse PortfoliosIssuersResponse
 
 	err := c.doRequest(
 		ctx,
 		fmt.Sprintf(PortfoliosIssuersBaseURL, portfolioId),
-		&issuerReponse,
+		&issuersReponse,
 		queryParams,
 	)
 
@@ -186,22 +186,22 @@ func (c *Client) GetIssuersForPortfolio(ctx context.Context, portfolioId string,
 	}
 
 	// check for duplicates to prevent infinite loop (this can happen with mock data)
-	if getIssuerVars.After != issuerReponse.Next && issuerReponse.Next != "" {
-		return issuerReponse.Issuers, issuerReponse.Next, nil
+	if getIssuerVars.After != issuersReponse.Next && issuersReponse.Next != "" {
+		return issuersReponse.Issuers, issuersReponse.Next, nil
 	}
 
-	return issuerReponse.Issuers, "", nil
+	return issuersReponse.Issuers, "", nil
 }
 
 // GetInvestors returns all investor firms accessible to the user.
 func (c *Client) GetInvestors(ctx context.Context, getInvestorVars PaginationParams) ([]InvestorFirm, string, error) {
 	queryParams := setupPaginationQuery(url.Values{}, getInvestorVars.Size, getInvestorVars.After)
-	var userResponse InvestorResponse
+	var investorsResponse InvestorsResponse
 
 	err := c.doRequest(
 		ctx,
 		InvestorsBaseURL,
-		&userResponse,
+		&investorsResponse,
 		queryParams,
 	)
 
@@ -210,11 +210,11 @@ func (c *Client) GetInvestors(ctx context.Context, getInvestorVars PaginationPar
 	}
 
 	// check for duplicates to prevent infinite loop (this can happen with mock data)
-	if getInvestorVars.After != userResponse.Next && userResponse.Next != "" {
-		return userResponse.Firms, userResponse.Next, nil
+	if getInvestorVars.After != investorsResponse.Next && investorsResponse.Next != "" {
+		return investorsResponse.Firms, investorsResponse.Next, nil
 	}
 
-	return userResponse.Firms, "", nil
+	return investorsResponse.Firms, "", nil
 }
 
 func (c *Client) doRequest(ctx context.Context, url string, resourceResponse interface{}, queryParams url.Values) error {
