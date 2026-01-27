@@ -6,11 +6,9 @@ import (
 	"time"
 
 	ratelimitV1 "github.com/conductorone/baton-sdk/pb/c1/ratelimit/v1"
-	v1 "github.com/conductorone/baton-sdk/pb/c1/ratelimit/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	rl "go.uber.org/ratelimit"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type MemRateLimiter struct {
@@ -23,52 +21,52 @@ type MemRateLimiter struct {
 // TODO
 func (m *MemRateLimiter) Do(ctx context.Context, req *ratelimitV1.DoRequest) (*ratelimitV1.DoResponse, error) {
 	if m.limiter == nil {
-		return &v1.DoResponse{
-			RequestToken: req.RequestToken,
-			Description: &v1.RateLimitDescription{
-				Status: v1.RateLimitDescription_EMPTY,
-			},
-		}, nil
+		return ratelimitV1.DoResponse_builder{
+			RequestToken: req.GetRequestToken(),
+			Description: ratelimitV1.RateLimitDescription_builder{
+				Status: ratelimitV1.RateLimitDescription_STATUS_EMPTY,
+			}.Build(),
+		}.Build(), nil
 	}
 
 	m.limiter.Take()
 
-	return &v1.DoResponse{
-		RequestToken: req.RequestToken,
-		Description: &v1.RateLimitDescription{
-			Status: v1.RateLimitDescription_EMPTY,
-		},
-	}, nil
+	return ratelimitV1.DoResponse_builder{
+		RequestToken: req.GetRequestToken(),
+		Description: ratelimitV1.RateLimitDescription_builder{
+			Status: ratelimitV1.RateLimitDescription_STATUS_EMPTY,
+		}.Build(),
+	}.Build(), nil
 }
 
 // Report updates the rate limiter with relevant information.
-func (m *MemRateLimiter) Report(ctx context.Context, req *ratelimitV1.ReportRequest) (*emptypb.Empty, error) {
+func (m *MemRateLimiter) Report(ctx context.Context, req *ratelimitV1.ReportRequest) (*ratelimitV1.ReportResponse, error) {
 	m.Lock()
 	defer m.Unlock()
 
 	if m.usePercent == 0 {
-		return &emptypb.Empty{}, nil
+		return &ratelimitV1.ReportResponse{}, nil
 	}
 
 	if req.GetDescription() == nil {
-		return &emptypb.Empty{}, nil
+		return &ratelimitV1.ReportResponse{}, nil
 	}
 	desc := req.GetDescription()
 
-	if desc.ResetAt == nil {
-		return &emptypb.Empty{}, nil
+	if !desc.HasResetAt() {
+		return &ratelimitV1.ReportResponse{}, nil
 	}
 
-	if desc.Remaining == 0 {
-		return &emptypb.Empty{}, nil
+	if desc.GetRemaining() == 0 {
+		return &ratelimitV1.ReportResponse{}, nil
 	}
 
-	resetAt := desc.ResetAt.AsTime().UTC()
+	resetAt := desc.GetResetAt().AsTime().UTC()
 	windowDuration := resetAt.Sub(m.now())
 	if windowDuration > 5*time.Minute {
 		windowDuration = 5 * time.Minute
 	}
-	remaining := int64(m.usePercent * float64(desc.Remaining))
+	remaining := int64(m.usePercent * float64(desc.GetRemaining()))
 	if remaining < 1 {
 		remaining = 1
 	}
@@ -77,13 +75,13 @@ func (m *MemRateLimiter) Report(ctx context.Context, req *ratelimitV1.ReportRequ
 	ctxzap.Extract(ctx).Debug(
 		"updating rate limiter",
 		zap.Int64("calculated_remaining", remaining),
-		zap.Int64("remaining", desc.Remaining),
+		zap.Int64("remaining", desc.GetRemaining()),
 		zap.Int64("rate", limiterSize),
 		zap.Time("reset_at", resetAt),
 	)
 	m.limiter = rl.New(int(limiterSize))
 
-	return &emptypb.Empty{}, nil
+	return &ratelimitV1.ReportResponse{}, nil
 }
 
 // NewSlidingMemoryRateLimiter returns an in-memory limiter that attempts to use rate limiting reports to define a

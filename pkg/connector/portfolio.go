@@ -30,7 +30,7 @@ func portfolioResource(ctx context.Context, portfolio *carta.Portfolio, parentRe
 	profile := map[string]interface{}{
 		"portfolio_legal_name": portfolio.Name,
 		"portfolio_id":         portfolio.Id,
-		"portfolio_issuer_ids": strings.Join(mapIssuerIds(portfolio.Issuers), ","),
+		"portfolio_issuer_ids": strings.Join(mapIssuerIDs(portfolio.Issuers), ","),
 	}
 
 	portfolioTraitOptions := []rs.GroupTraitOption{
@@ -109,16 +109,16 @@ func (o *portfolioResourceType) Grants(ctx context.Context, resource *v2.Resourc
 		return nil, "", nil, err
 	}
 
-	issuerIdsString, ok := rs.GetProfileStringValue(portfolioTrait.Profile, "portfolio_issuer_ids")
+	issuerIDsString, ok := rs.GetProfileStringValue(portfolioTrait.Profile, "portfolio_issuer_ids")
 	if !ok {
 		return nil, "", nil, fmt.Errorf("error fetching issuer ids from portfolio profile")
 	}
 
-	issuerIds := strings.Split(issuerIdsString, ",")
+	issuerIDs := strings.Split(issuerIDsString, ",")
 
 	// create membership grants
 	var rv []*v2.Grant
-	for _, id := range issuerIds {
+	for _, id := range issuerIDs {
 		issuer, err := o.client.GetIssuer(ctx, id)
 		if err != nil {
 			return nil, "", nil, err

@@ -1,170 +1,279 @@
 package cli
 
 import (
-	"bufio"
 	"context"
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"os"
-	"strings"
+	"reflect"
 
-	"github.com/conductorone/baton-sdk/internal/connector"
-	v1 "github.com/conductorone/baton-sdk/pb/c1/connector_wrapper/v1"
-	"github.com/conductorone/baton-sdk/pkg/logging"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/conductorone/baton-sdk/pkg/types"
+	"github.com/conductorone/baton-sdk/pkg/types/sessions"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"google.golang.org/protobuf/proto"
+	"golang.org/x/oauth2"
 )
 
-const (
-	defaultConfigFilename = ".baton-%s"
-	envPrefix             = "baton"
-	defaultLogLevel       = "info"
-	defaultLogFormat      = logging.LogFormatJSON
-)
-
-type BaseConfig struct {
-	LogLevel  string `mapstructure:"log-level"`
-	LogFormat string `mapstructure:"log-format"`
-	C1zPath   string `mapstructure:"file"`
+type RunTimeOpts struct {
+	SessionStore sessions.SessionStore
+	TokenSource  oauth2.TokenSource
 }
 
-// NewCmd returns a new cobra command that will populate the provided config object, validate it, and run the provided run function.
-func NewCmd[T any, PtrT *T](
-	ctx context.Context,
-	name string,
-	cfg PtrT,
-	validateF func(ctx context.Context, cfg PtrT) error,
-	getConnector func(ctx context.Context, cfg PtrT) (types.ConnectorServer, error),
-	runF func(ctx context.Context, cfg PtrT) error,
-) (*cobra.Command, error) {
-	cmd := &cobra.Command{
-		Use:   name,
-		Short: name,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			v, err := loadConfig(name, cmd, cfg)
-			if err != nil {
-				return err
-			}
+// GetConnectorFunc is a function type that creates a connector instance.
+// It takes a context and configuration. The session cache constructor is retrieved from the context.
+type GetConnectorFunc[T field.Configurable] func(ctx context.Context, cfg T) (types.ConnectorServer, error)
+type GetConnectorFunc2[T field.Configurable] func(ctx context.Context, cfg T, runTimeOpts RunTimeOpts) (types.ConnectorServer, error)
 
-			loggerCtx, err := logging.Init(ctx, v.GetString("log-format"), v.GetString("log-level"))
-			if err != nil {
-				return err
-			}
-
-			err = validateF(ctx, cfg)
-			if err != nil {
-				return err
-			}
-
-			return runF(loggerCtx, cfg)
-		},
+// WithSessionCache creates a session cache using the provided constructor and adds it to the context.
+func WithSessionCache(ctx context.Context, constructor sessions.SessionStoreConstructor) (context.Context, error) {
+	sessionCache, err := constructor(ctx)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create session cache: %w", err)
 	}
-
-	grpcServerCmd := &cobra.Command{
-		Use:    "_connector-service",
-		Short:  "Start the connector service",
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			v, err := loadConfig(name, cmd, cfg)
-			if err != nil {
-				return err
-			}
-
-			loggerCtx, err := logging.Init(ctx, v.GetString("log-format"), v.GetString("log-level"))
-			if err != nil {
-				return err
-			}
-
-			err = validateF(loggerCtx, cfg)
-			if err != nil {
-				return err
-			}
-
-			c, err := getConnector(loggerCtx, cfg)
-			if err != nil {
-				return err
-			}
-			cw, err := connector.NewWrapper(ctx, c)
-			if err != nil {
-				return err
-			}
-
-			var cfgStr string
-			scn := bufio.NewScanner(os.Stdin)
-			for scn.Scan() {
-				cfgStr = scn.Text()
-				break
-			}
-			cfgBytes, err := base64.StdEncoding.DecodeString(cfgStr)
-			if err != nil {
-				return err
-			}
-
-			go func() {
-				in := make([]byte, 1)
-				_, err := os.Stdin.Read(in)
-				if err != nil {
-					os.Exit(0)
-				}
-			}()
-
-			if len(cfgBytes) == 0 {
-				return fmt.Errorf("unexpected empty input")
-			}
-
-			serverCfg := &v1.ServerConfig{}
-			err = proto.Unmarshal(cfgBytes, serverCfg)
-			if err != nil {
-				return err
-			}
-
-			err = serverCfg.ValidateAll()
-			if err != nil {
-				return err
-			}
-
-			return cw.Run(loggerCtx, serverCfg)
-		},
-	}
-
-	cmd.AddCommand(grpcServerCmd)
-
-	cmd.PersistentFlags().String("log-level", defaultLogLevel, "The log level: debug, info, warn, error ($BATON_LOG_LEVEL)")
-	cmd.PersistentFlags().String("log-format", defaultLogFormat, "The output format for logs: json, console ($BATON_LOG_FORMAT)")
-	cmd.PersistentFlags().StringP("file", "f", "sync.c1z", "The path to the c1z file to sync with ($BATON_FILE)")
-
-	return cmd, nil
+	return context.WithValue(ctx, sessions.SessionStoreKey{}, sessionCache), nil
 }
 
-// loadConfig sets viper up to parse the config into the provided configuration object.
-func loadConfig[T any, PtrT *T](name string, cmd *cobra.Command, cfg PtrT) (*viper.Viper, error) {
-	v := viper.New()
-	v.SetConfigType("yaml")
-	v.SetConfigName(fmt.Sprintf(defaultConfigFilename, name))
-	v.AddConfigPath(".")
+type ConnectorOpts struct {
+	TokenSource oauth2.TokenSource
+}
+type NewConnector[T field.Configurable] func(ctx context.Context, cfg T, opts *ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error)
 
-	if err := v.ReadInConfig(); err != nil {
-		if ok := !errors.Is(err, viper.ConfigFileNotFoundError{}); !ok {
+func MakeGenericConfiguration[T field.Configurable](v *viper.Viper, opts ...field.DecodeHookOption) (T, error) {
+	// Create an instance of the struct type T using reflection
+	var config T // Create a zero-value instance of T
+
+	// Is it a *Viper?
+	if reflect.TypeOf(config) == reflect.TypeOf((*viper.Viper)(nil)) {
+		if t, ok := any(v).(T); ok {
+			return t, nil
+		}
+		return config, fmt.Errorf("cannot convert *viper.Viper to %T", config)
+	}
+
+	// Unmarshal into the config struct with any decode hook options provided
+	err := v.Unmarshal(&config, viper.DecodeHook(field.ComposeDecodeHookFunc(opts...)))
+	if err != nil {
+		return config, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	return config, nil
+}
+
+// NOTE(shackra): Set all values from Viper to the flags so...
+// that Cobra won't complain that a flag is missing in case we...
+// pass values through environment variables.
+func VisitFlags(cmd *cobra.Command, v *viper.Viper) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if v.IsSet(f.Name) {
+			_ = cmd.Flags().Set(f.Name, v.GetString(f.Name))
+		}
+	})
+}
+
+func AddCommand(mainCMD *cobra.Command, v *viper.Viper, schema *field.Configuration, subCMD *cobra.Command) (*cobra.Command, error) {
+	mainCMD.AddCommand(subCMD)
+	if schema != nil {
+		err := SetFlagsAndConstraints(subCMD, *schema)
+		if err != nil {
 			return nil, err
 		}
 	}
+	VisitFlags(subCMD, v)
 
-	v.SetEnvPrefix(envPrefix)
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	v.AutomaticEnv()
-	if err := v.BindPFlags(cmd.PersistentFlags()); err != nil {
-		return nil, err
-	}
-	if err := v.BindPFlags(cmd.Flags()); err != nil {
-		return nil, err
+	return subCMD, nil
+}
+func SetFlagsAndConstraints(command *cobra.Command, schema field.Configuration) error {
+	// add options
+	for _, f := range schema.Fields {
+		switch f.Variant {
+		case field.BoolVariant:
+			value, err := field.GetDefaultValue[bool](f)
+			if err != nil {
+				return fmt.Errorf(
+					"field %s, %s: %w",
+					f.FieldName,
+					f.Variant,
+					err,
+				)
+			}
+			if f.IsPersistent() {
+				command.PersistentFlags().
+					BoolP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			} else {
+				command.Flags().
+					BoolP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			}
+		case field.IntVariant:
+			value, err := field.GetDefaultValue[int](f)
+			if err != nil {
+				return fmt.Errorf(
+					"field %s, %s: %w",
+					f.FieldName,
+					f.Variant,
+					err,
+				)
+			}
+			if f.IsPersistent() {
+				command.PersistentFlags().
+					IntP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			} else {
+				command.Flags().
+					IntP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			}
+		case field.StringVariant:
+			value, err := field.GetDefaultValue[string](f)
+			if err != nil {
+				return fmt.Errorf(
+					"field %s, %s: %w",
+					f.FieldName,
+					f.Variant,
+					err,
+				)
+			}
+			if f.IsPersistent() {
+				command.PersistentFlags().
+					StringP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			} else {
+				command.Flags().
+					StringP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			}
+
+		case field.StringSliceVariant:
+			value, err := field.GetDefaultValue[[]string](f)
+			if err != nil {
+				return fmt.Errorf(
+					"field %s, %s: %w",
+					f.FieldName,
+					f.Variant,
+					err,
+				)
+			}
+			if f.IsPersistent() {
+				command.PersistentFlags().
+					StringSliceP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			} else {
+				command.Flags().
+					StringSliceP(f.FieldName, f.GetCLIShortHand(), *value, f.GetDescription())
+			}
+		case field.StringMapVariant:
+			value, err := field.GetDefaultValue[map[string]any](f)
+			if err != nil {
+				return fmt.Errorf(
+					"field %s, %s: %w",
+					f.FieldName,
+					f.Variant,
+					err,
+				)
+			}
+			strMap := make(map[string]string)
+			for k, v := range *value {
+				switch val := v.(type) {
+				case string:
+					strMap[k] = val
+				case int:
+					strMap[k] = fmt.Sprintf("%d", val)
+				case bool:
+					strMap[k] = fmt.Sprintf("%v", val)
+				case float64:
+					strMap[k] = fmt.Sprintf("%g", val)
+				default:
+					strMap[k] = fmt.Sprintf("%v", val)
+				}
+			}
+			if f.IsPersistent() {
+				command.PersistentFlags().
+					StringToStringP(f.FieldName, f.GetCLIShortHand(), strMap, f.GetDescription())
+			} else {
+				command.Flags().
+					StringToStringP(f.FieldName, f.GetCLIShortHand(), strMap, f.GetDescription())
+			}
+		default:
+			return fmt.Errorf(
+				"field %s, %s is not yet supported",
+				f.FieldName,
+				f.Variant,
+			)
+		}
+
+		// mark hidden
+		if f.IsHidden() {
+			if f.IsPersistent() {
+				err := command.PersistentFlags().MarkHidden(f.FieldName)
+				if err != nil {
+					return fmt.Errorf(
+						"cannot hide persistent field %s, %s: %w",
+						f.FieldName,
+						f.Variant,
+						err,
+					)
+				}
+			} else {
+				err := command.Flags().MarkHidden(f.FieldName)
+				if err != nil {
+					return fmt.Errorf(
+						"cannot hide field %s, %s: %w",
+						f.FieldName,
+						f.Variant,
+						err,
+					)
+				}
+			}
+		}
+
+		// mark required
+		if f.Required && len(schema.FieldGroups) == 0 {
+			if f.Variant == field.BoolVariant {
+				return fmt.Errorf("requiring %s of type %s does not make sense", f.FieldName, f.Variant)
+			}
+
+			if f.IsPersistent() {
+				err := command.MarkPersistentFlagRequired(f.FieldName)
+				if err != nil {
+					return fmt.Errorf(
+						"cannot require persistent field %s, %s: %w",
+						f.FieldName,
+						f.Variant,
+						err,
+					)
+				}
+			} else {
+				err := command.MarkFlagRequired(f.FieldName)
+				if err != nil {
+					return fmt.Errorf(
+						"cannot require field %s, %s: %w",
+						f.FieldName,
+						f.Variant,
+						err,
+					)
+				}
+			}
+		}
 	}
 
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, err
+	// apply constrains
+	for _, constrain := range schema.Constraints {
+		switch constrain.Kind {
+		case field.MutuallyExclusive:
+			command.MarkFlagsMutuallyExclusive(listFieldConstrainsAsStrings(constrain)...)
+		case field.RequiredTogether:
+			command.MarkFlagsRequiredTogether(listFieldConstrainsAsStrings(constrain)...)
+		case field.AtLeastOne:
+			command.MarkFlagsOneRequired(listFieldConstrainsAsStrings(constrain)...)
+		case field.Dependents:
+			// do nothing
+		default:
+			return fmt.Errorf("invalid config")
+		}
 	}
 
-	return v, nil
+	return nil
+}
+
+func listFieldConstrainsAsStrings(constrains field.SchemaFieldRelationship) []string {
+	var fields []string
+	for _, v := range constrains.Fields {
+		fields = append(fields, v.FieldName)
+	}
+
+	return fields
 }

@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	awsSdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
-	_ "github.com/aws/aws-sdk-go-v2/aws/arn"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
@@ -26,6 +26,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
+
+const defaultS3MaxFilesize = 256 * 1024 * 1024
 
 type S3Client struct {
 	awsConfig  awsSdk.Config
@@ -171,6 +173,20 @@ func parseS3Uri(s3Uri string) (*S3BucketConfig, error) {
 	return ret, nil
 }
 
+func fetchS3MaxFilesize() int64 {
+	s3MaxFilesize := os.Getenv("BATON_S3_MAX_FILESIZE_MB")
+	if s3MaxFilesize == "" {
+		return defaultS3MaxFilesize
+	}
+
+	maxFilesize, err := strconv.ParseInt(s3MaxFilesize, 10, 64)
+	if err != nil {
+		return defaultS3MaxFilesize
+	}
+
+	return maxFilesize * 1024 * 1024
+}
+
 // NewClientFromURI parses an s3://bucket/uri and creates a client. It also returns the key specified in the URI.
 func NewClientFromURI(ctx context.Context, uri string) (string, *S3Client, error) {
 	s3Cfg, err := parseS3Uri(uri)
@@ -179,7 +195,7 @@ func NewClientFromURI(ctx context.Context, uri string) (string, *S3Client, error
 	}
 
 	opts := []Option{
-		WithMaxDownloadFilesize(32 * 1024 * 1024), // Max filesize of 32MB
+		WithMaxDownloadFilesize(fetchS3MaxFilesize()),
 	}
 
 	if s3Cfg.region != "" {
@@ -237,22 +253,6 @@ func NewClient(ctx context.Context, bucketName string, opts ...Option) (*S3Clien
 		awsOpts = append(awsOpts,
 			awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.accessKeyID, cfg.secretAccessKey, "")),
 		)
-	}
-
-	if cfg.endpointURL != "" {
-		customResolver := awsSdk.EndpointResolverWithOptionsFunc(func(service string, region string, optFns ...interface{}) (awsSdk.Endpoint, error) {
-			if service == s3.ServiceID && region == cfg.region {
-				return awsSdk.Endpoint{
-					PartitionID:       "aws",
-					URL:               cfg.endpointURL,
-					SigningRegion:     cfg.region,
-					HostnameImmutable: true,
-				}, nil
-			}
-
-			return awsSdk.Endpoint{}, &awsSdk.EndpointNotFoundError{}
-		})
-		awsOpts = append(awsOpts, awsConfig.WithEndpointResolverWithOptions(customResolver))
 	}
 
 	baseConfig, err := awsConfig.LoadDefaultConfig(ctx, awsOpts...)
@@ -326,7 +326,14 @@ func (s *S3Client) newConfiguredS3Client(ctx context.Context) (*s3.Client, error
 		return nil, err
 	}
 
-	s3svc := s3.NewFromConfig(callingConfig)
+	s3svc := s3.NewFromConfig(callingConfig,
+		func(o *s3.Options) {
+			if s.cfg.endpointURL == "" {
+				ep := s.cfg.endpointURL
+				o.BaseEndpoint = &ep
+			}
+		},
+	)
 	location, err := s3svc.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
 		Bucket: awsSdk.String(s.cfg.bucketName),
 	})
@@ -392,7 +399,7 @@ func (s *S3Client) ObjectInfo(ctx context.Context, key string) (*ObjectInfo, err
 	}
 
 	ret.ETag = awsSdk.ToString(headOut.ETag)
-	ret.ContentLength = headOut.ContentLength
+	ret.ContentLength = awsSdk.ToInt64(headOut.ContentLength)
 	ret.Sha256Sum = awsSdk.ToString(headOut.ChecksumSHA256)
 	ret.LastModified = awsSdk.ToTime(headOut.LastModified)
 
