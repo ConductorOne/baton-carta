@@ -81,7 +81,7 @@ type AssetRefMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AssetRefMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -221,7 +221,7 @@ type AssetServiceGetAssetRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AssetServiceGetAssetRequestMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -310,9 +310,20 @@ func (m *AssetServiceGetAssetResponse) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Msg.(type) {
-
+	oneofMsgPresent := false
+	switch v := m.Msg.(type) {
 	case *AssetServiceGetAssetResponse_Metadata_:
+		if v == nil {
+			err := AssetServiceGetAssetResponseValidationError{
+				field:  "Msg",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofMsgPresent = true
 
 		if all {
 			switch v := interface{}(m.GetMetadata()).(type) {
@@ -344,6 +355,17 @@ func (m *AssetServiceGetAssetResponse) validate(all bool) error {
 		}
 
 	case *AssetServiceGetAssetResponse_Data_:
+		if v == nil {
+			err := AssetServiceGetAssetResponseValidationError{
+				field:  "Msg",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofMsgPresent = true
 
 		if all {
 			switch v := interface{}(m.GetData()).(type) {
@@ -375,6 +397,9 @@ func (m *AssetServiceGetAssetResponse) validate(all bool) error {
 		}
 
 	default:
+		_ = v // ensures v is used
+	}
+	if !oneofMsgPresent {
 		err := AssetServiceGetAssetResponseValidationError{
 			field:  "Msg",
 			reason: "value is required",
@@ -383,7 +408,6 @@ func (m *AssetServiceGetAssetResponse) validate(all bool) error {
 			return err
 		}
 		errors = append(errors, err)
-
 	}
 
 	if len(errors) > 0 {
@@ -400,7 +424,7 @@ type AssetServiceGetAssetResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AssetServiceGetAssetResponseMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -516,7 +540,7 @@ type AssetServiceGetAssetResponse_MetadataMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AssetServiceGetAssetResponse_MetadataMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -632,7 +656,7 @@ type AssetServiceGetAssetResponse_DataMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m AssetServiceGetAssetResponse_DataMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}

@@ -108,7 +108,7 @@ type RateLimitDescriptionMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m RateLimitDescriptionMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -272,7 +272,7 @@ type ReportRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ReportRequestMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -335,6 +335,106 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ReportRequestValidationError{}
+
+// Validate checks the field values on ReportResponse with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *ReportResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ReportResponse with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in ReportResponseMultiError,
+// or nil if none found.
+func (m *ReportResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ReportResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return ReportResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// ReportResponseMultiError is an error wrapping multiple validation errors
+// returned by ReportResponse.ValidateAll() if the designated constraints
+// aren't met.
+type ReportResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ReportResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ReportResponseMultiError) AllErrors() []error { return m }
+
+// ReportResponseValidationError is the validation error returned by
+// ReportResponse.Validate if the designated constraints aren't met.
+type ReportResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ReportResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ReportResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ReportResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ReportResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ReportResponseValidationError) ErrorName() string { return "ReportResponseValidationError" }
+
+// Error satisfies the builtin error interface
+func (e ReportResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sReportResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ReportResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ReportResponseValidationError{}
 
 // Validate checks the field values on RateLimitDescriptors with the rules
 // defined in the proto definition for this message. If any rules are
@@ -417,7 +517,7 @@ type RateLimitDescriptorsMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m RateLimitDescriptorsMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -551,7 +651,7 @@ type DoRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m DoRequestMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -681,7 +781,7 @@ type DoResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m DoResponseMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -781,7 +881,7 @@ type DisabledLimiterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m DisabledLimiterMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -883,7 +983,7 @@ type SlidingMemoryLimiterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SlidingMemoryLimiterMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1016,7 +1116,7 @@ type FixedMemoryLimiterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m FixedMemoryLimiterMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1122,7 +1222,7 @@ type ExternalLimiterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ExternalLimiterMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1208,9 +1308,18 @@ func (m *RateLimiterConfig) validate(all bool) error {
 
 	var errors []error
 
-	switch m.Type.(type) {
-
+	switch v := m.Type.(type) {
 	case *RateLimiterConfig_Disabled:
+		if v == nil {
+			err := RateLimiterConfigValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetDisabled()).(type) {
@@ -1242,6 +1351,16 @@ func (m *RateLimiterConfig) validate(all bool) error {
 		}
 
 	case *RateLimiterConfig_SlidingMem:
+		if v == nil {
+			err := RateLimiterConfigValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSlidingMem()).(type) {
@@ -1273,6 +1392,16 @@ func (m *RateLimiterConfig) validate(all bool) error {
 		}
 
 	case *RateLimiterConfig_FixedMem:
+		if v == nil {
+			err := RateLimiterConfigValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetFixedMem()).(type) {
@@ -1304,6 +1433,16 @@ func (m *RateLimiterConfig) validate(all bool) error {
 		}
 
 	case *RateLimiterConfig_External:
+		if v == nil {
+			err := RateLimiterConfigValidationError{
+				field:  "Type",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetExternal()).(type) {
@@ -1334,6 +1473,8 @@ func (m *RateLimiterConfig) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -1350,7 +1491,7 @@ type RateLimiterConfigMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m RateLimiterConfigMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1474,7 +1615,7 @@ type RateLimitDescriptors_EntryMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m RateLimitDescriptors_EntryMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}

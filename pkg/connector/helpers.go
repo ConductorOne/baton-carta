@@ -25,7 +25,7 @@ func parsePageToken(i string, resourceID *v2.ResourceId) (*pagination.Bag, error
 	return b, nil
 }
 
-func mapIssuerIds(issuers []carta.Issuer) []string {
+func mapIssuerIDs(issuers []carta.Issuer) []string {
 	ids := make([]string, len(issuers))
 
 	for i, issuer := range issuers {

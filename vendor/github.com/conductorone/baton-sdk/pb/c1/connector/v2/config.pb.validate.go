@@ -71,7 +71,7 @@ type SchemaServiceGetSchemaRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SchemaServiceGetSchemaRequestMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -205,7 +205,7 @@ type SchemaServiceGetSchemaResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SchemaServiceGetSchemaResponseMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -403,7 +403,7 @@ type ConfigSchemaMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m ConfigSchemaMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -496,9 +496,18 @@ func (m *Field) validate(all bool) error {
 
 	// no validation rules for Placeholder
 
-	switch m.Field.(type) {
-
+	switch v := m.Field.(type) {
 	case *Field_Str:
+		if v == nil {
+			err := FieldValidationError{
+				field:  "Field",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetStr()).(type) {
@@ -530,6 +539,16 @@ func (m *Field) validate(all bool) error {
 		}
 
 	case *Field_Select:
+		if v == nil {
+			err := FieldValidationError{
+				field:  "Field",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetSelect()).(type) {
@@ -561,6 +580,16 @@ func (m *Field) validate(all bool) error {
 		}
 
 	case *Field_Random:
+		if v == nil {
+			err := FieldValidationError{
+				field:  "Field",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetRandom()).(type) {
@@ -592,6 +621,16 @@ func (m *Field) validate(all bool) error {
 		}
 
 	case *Field_File:
+		if v == nil {
+			err := FieldValidationError{
+				field:  "Field",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(m.GetFile()).(type) {
@@ -622,6 +661,8 @@ func (m *Field) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
 	}
 
 	if len(errors) > 0 {
@@ -637,7 +678,7 @@ type FieldMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m FieldMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -767,7 +808,7 @@ type StringFieldMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m StringFieldMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -900,7 +941,7 @@ type SelectFieldMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SelectFieldMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1002,7 +1043,7 @@ type RandomStringFieldMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m RandomStringFieldMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1134,7 +1175,7 @@ type FileFieldMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m FileFieldMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1238,7 +1279,7 @@ type SelectField_ItemMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m SelectField_ItemMultiError) Error() string {
-	var msgs []string
+	msgs := make([]string, 0, len(m))
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}

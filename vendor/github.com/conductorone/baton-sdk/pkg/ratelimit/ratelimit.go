@@ -18,7 +18,7 @@ const (
 )
 
 // NewLimiter configures a RateLimitServer server.
-func NewLimiter(ctx context.Context, now func() time.Time, cfg *ratelimitV1.RateLimiterConfig) (ratelimitV1.RateLimiterServer, error) {
+func NewLimiter(ctx context.Context, now func() time.Time, cfg *ratelimitV1.RateLimiterConfig) (ratelimitV1.RateLimiterServiceServer, error) {
 	if cfg == nil {
 		return &NoOpRateLimiter{}, nil
 	}
@@ -28,11 +28,11 @@ func NewLimiter(ctx context.Context, now func() time.Time, cfg *ratelimitV1.Rate
 	}
 
 	if c := cfg.GetSlidingMem(); c != nil {
-		return NewSlidingMemoryRateLimiter(ctx, now, c.UsePercent), nil
+		return NewSlidingMemoryRateLimiter(ctx, now, c.GetUsePercent()), nil
 	}
 
 	if c := cfg.GetFixedMem(); c != nil {
-		return NewFixedMemoryRateLimiter(ctx, now, c.Rate, c.Period.AsDuration()), nil
+		return NewFixedMemoryRateLimiter(ctx, now, c.GetRate(), c.GetPeriod().AsDuration()), nil
 	}
 
 	if c := cfg.GetExternal(); c != nil {

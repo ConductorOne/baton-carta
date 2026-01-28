@@ -13,27 +13,52 @@ const (
 	LogFormatConsole = "console"
 )
 
+type Option func(*zap.Config)
+
+func WithLogLevel(level string) Option {
+	return func(c *zap.Config) {
+		ll := zapcore.DebugLevel
+		_ = ll.Set(level)
+		c.Level.SetLevel(ll)
+	}
+}
+
+func WithLogFormat(format string) Option {
+	return func(c *zap.Config) {
+		switch format {
+		case LogFormatJSON:
+			c.Encoding = LogFormatJSON
+		case LogFormatConsole:
+			c.Encoding = LogFormatConsole
+			c.EncoderConfig = zap.NewDevelopmentEncoderConfig()
+		default:
+			c.Encoding = LogFormatJSON
+		}
+	}
+}
+
+func WithOutputPaths(paths []string) Option {
+	return func(c *zap.Config) {
+		c.OutputPaths = paths
+	}
+}
+
+// WithInitialFields allows the logger to be configured with static fields at creation time.
+// This is useful for setting fields that are constant across all log messages.
+func WithInitialFields(fields map[string]interface{}) Option {
+	return func(c *zap.Config) {
+		c.InitialFields = fields
+	}
+}
+
 // Init creates a new zap logger and attaches it to the provided context.
-func Init(ctx context.Context, format string, level string) (context.Context, error) {
+func Init(ctx context.Context, opts ...Option) (context.Context, error) {
 	zc := zap.NewProductionConfig()
 	zc.Sampling = nil
 	zc.DisableStacktrace = true
 
-	ll := zapcore.DebugLevel
-	err := ll.Set(level)
-	if err != nil {
-		return ctx, err
-	}
-	zc.Level.SetLevel(ll)
-
-	zc.EncoderConfig = zap.NewDevelopmentEncoderConfig()
-	switch format {
-	case LogFormatJSON:
-		zc.Encoding = LogFormatJSON
-	case LogFormatConsole:
-		zc.Encoding = LogFormatConsole
-	default:
-		zc.Encoding = LogFormatJSON
+	for _, opt := range opts {
+		opt(&zc)
 	}
 
 	l, err := zc.Build()
