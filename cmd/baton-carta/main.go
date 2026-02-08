@@ -44,7 +44,7 @@ func main() {
 func getConnector(ctx context.Context, c *cfg.Carta) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
 
-	cartaConnector, err := connector.New(ctx, c.Token)
+	cartaConnector, err := connector.New(ctx, c.Token, c.BaseUrl)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err

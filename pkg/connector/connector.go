@@ -58,7 +58,7 @@ func (c *Carta) Validate(ctx context.Context) (annotations.Annotations, error) {
 }
 
 // New returns the Carta connector.
-func New(ctx context.Context, accessToken string) (*Carta, error) {
+func New(ctx context.Context, accessToken string, baseURL string) (*Carta, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 
 	if err != nil {
@@ -66,6 +66,6 @@ func New(ctx context.Context, accessToken string) (*Carta, error) {
 	}
 
 	return &Carta{
-		client: carta.NewClient(accessToken, httpClient),
+		client: carta.NewClient(accessToken, baseURL, httpClient),
 	}, nil
 }
