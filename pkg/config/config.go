@@ -15,6 +15,7 @@ var (
 		"base-url",
 		field.WithDescription("Override the Carta API URL (for testing)"),
 		field.WithHidden(true),
+		field.WithExportTarget(field.ExportTargetCLIOnly),
 	)
 )
 
