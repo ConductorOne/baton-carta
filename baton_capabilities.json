@@ -1,48 +1,48 @@
 {
-  "@type": "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
-  "resourceTypeCapabilities": [
+  "@type":  "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
+  "resourceTypeCapabilities":  [
     {
-      "resourceType": {
-        "id": "investor",
-        "displayName": "Investor",
-        "traits": [
+      "resourceType":  {
+        "id":  "investor",
+        "displayName":  "Investor",
+        "traits":  [
           "TRAIT_USER"
         ]
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ],
-      "permissions": {}
+      "permissions":  {}
     },
     {
-      "resourceType": {
-        "id": "issuer",
-        "displayName": "Issuer",
-        "traits": [
+      "resourceType":  {
+        "id":  "issuer",
+        "displayName":  "Issuer",
+        "traits":  [
           "TRAIT_USER"
         ]
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ],
-      "permissions": {}
+      "permissions":  {}
     },
     {
-      "resourceType": {
-        "id": "portfolio",
-        "displayName": "Portfolio",
-        "traits": [
+      "resourceType":  {
+        "id":  "portfolio",
+        "displayName":  "Portfolio",
+        "traits":  [
           "TRAIT_GROUP"
         ]
       },
-      "capabilities": [
+      "capabilities":  [
         "CAPABILITY_SYNC"
       ],
-      "permissions": {}
+      "permissions":  {}
     }
   ],
-  "connectorCapabilities": [
+  "connectorCapabilities":  [
     "CAPABILITY_SYNC"
   ],
-  "credentialDetails": {}
+  "credentialDetails":  {}
 }
