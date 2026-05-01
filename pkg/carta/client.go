@@ -250,7 +250,7 @@ func (c *Client) doRequest(ctx context.Context, url string, resourceResponse int
 	req.Header.Add("authorization", fmt.Sprint("Bearer ", c.accessToken))
 	req.Header.Add("accept", "application/json")
 
-	rawResponse, err := c.httpClient.Do(req)
+	rawResponse, err := c.httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return err
 	}
