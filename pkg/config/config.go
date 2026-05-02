@@ -11,9 +11,16 @@ var (
 		field.WithRequired(true),
 		field.WithIsSecret(true),
 	)
+	BaseURLField = field.StringField(
+		"base-url",
+		field.WithDescription("Override the Carta API URL (for testing)"),
+		field.WithHidden(true),
+		field.WithExportTarget(field.ExportTargetCLIOnly),
+	)
 )
 
 //go:generate go run ./gen
 var Config = field.NewConfiguration([]field.SchemaField{
 	AccessToken,
+	BaseURLField,
 })

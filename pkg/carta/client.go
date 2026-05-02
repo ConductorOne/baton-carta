@@ -12,16 +12,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const BaseURL = "https://mock-api.carta.com/v1alpha1/"
-const InvestorsBaseURL = BaseURL + "investors/firms"
-const IssuersBaseURL = BaseURL + "issuers"
-const IssuerBaseURL = IssuersBaseURL + "/%s"
-const PortfoliosBaseURL = BaseURL + "portfolios"
-const PortfoliosIssuersBaseURL = PortfoliosBaseURL + "/%s/issuers"
+const DefaultBaseURL = "https://mock-api.carta.com/v1alpha1/"
 
 type Client struct {
 	httpClient  *http.Client
 	accessToken string
+	baseURL     string
 }
 
 type IssuerResponse struct {
@@ -53,11 +49,35 @@ type PaginationParams struct {
 	After string `json:"pageToken"`
 }
 
-func NewClient(accessToken string, httpClient *http.Client) *Client {
+func NewClient(accessToken string, baseURL string, httpClient *http.Client) *Client {
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
 	return &Client{
 		accessToken: accessToken,
 		httpClient:  httpClient,
+		baseURL:     baseURL,
 	}
+}
+
+func (c *Client) investorsBaseURL() string {
+	return c.baseURL + "investors/firms"
+}
+
+func (c *Client) issuersBaseURL() string {
+	return c.baseURL + "issuers"
+}
+
+func (c *Client) issuerBaseURL() string {
+	return c.issuersBaseURL() + "/%s"
+}
+
+func (c *Client) portfoliosBaseURL() string {
+	return c.baseURL + "portfolios"
+}
+
+func (c *Client) portfoliosIssuersBaseURL() string {
+	return c.portfoliosBaseURL() + "/%s/issuers"
 }
 
 func setupPaginationQuery(query url.Values, size int, after string) url.Values {
@@ -81,7 +101,7 @@ func (c *Client) GetIssuers(ctx context.Context, getIssuerVars PaginationParams)
 
 	err := c.doRequest(
 		ctx,
-		IssuersBaseURL,
+		c.issuersBaseURL(),
 		&issuersResponse,
 		queryParams,
 	)
@@ -104,7 +124,7 @@ func (c *Client) GetIssuer(ctx context.Context, issuerId string) (Issuer, error)
 
 	err := c.doRequest(
 		ctx,
-		fmt.Sprintf(IssuerBaseURL, issuerId),
+		fmt.Sprintf(c.issuerBaseURL(), issuerId),
 		&issuerResponse,
 		nil,
 	)
@@ -123,7 +143,7 @@ func (c *Client) GetPortfolios(ctx context.Context, getPortfolioVars PaginationP
 
 	err := c.doRequest(
 		ctx,
-		PortfoliosBaseURL,
+		c.portfoliosBaseURL(),
 		&portfoliosResponse,
 		queryParams,
 	)
@@ -176,7 +196,7 @@ func (c *Client) GetIssuersForPortfolio(ctx context.Context, portfolioId string,
 
 	err := c.doRequest(
 		ctx,
-		fmt.Sprintf(PortfoliosIssuersBaseURL, portfolioId),
+		fmt.Sprintf(c.portfoliosIssuersBaseURL(), portfolioId),
 		&issuersReponse,
 		queryParams,
 	)
@@ -200,7 +220,7 @@ func (c *Client) GetInvestors(ctx context.Context, getInvestorVars PaginationPar
 
 	err := c.doRequest(
 		ctx,
-		InvestorsBaseURL,
+		c.investorsBaseURL(),
 		&investorsResponse,
 		queryParams,
 	)
@@ -230,7 +250,7 @@ func (c *Client) doRequest(ctx context.Context, url string, resourceResponse int
 	req.Header.Add("authorization", fmt.Sprint("Bearer ", c.accessToken))
 	req.Header.Add("accept", "application/json")
 
-	rawResponse, err := c.httpClient.Do(req)
+	rawResponse, err := c.httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return err
 	}

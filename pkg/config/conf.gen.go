@@ -5,6 +5,7 @@ import "reflect"
 
 type Carta struct {
 	Token string `mapstructure:"token"`
+	BaseUrl string `mapstructure:"base-url"`
 }
 
 func (c *Carta) findFieldByTag(tagValue string) (any, bool) {
