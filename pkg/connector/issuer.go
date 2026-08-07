@@ -27,16 +27,15 @@ func issuerResource(ctx context.Context, issuer *carta.Issuer, parentResourceID 
 		"issuer_id":         issuer.Id,
 	}
 
-	issuerTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
-	}
+	issuerTraitOptions := []rs.UserTraitOption{}
 
 	resource, err := rs.NewUserResource(
 		issuer.Name,
 		resourceTypeIssuer,
 		issuer.Id,
 		issuerTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_UNSPECIFIED, ""),
 		rs.WithParentResourceID(parentResourceID),
 	)
 
