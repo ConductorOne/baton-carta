@@ -33,15 +33,14 @@ func portfolioResource(ctx context.Context, portfolio *carta.Portfolio, parentRe
 		"portfolio_issuer_ids": strings.Join(mapIssuerIDs(portfolio.Issuers), ","),
 	}
 
-	portfolioTraitOptions := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
+	portfolioTraitOptions := []rs.GroupTraitOption{}
 
 	resource, err := rs.NewGroupResource(
 		portfolio.Name,
 		resourceTypePortfolio,
 		portfolio.Id,
 		portfolioTraitOptions,
+		rs.WithResourceProfile(profile),
 	)
 
 	if err != nil {
@@ -104,12 +103,7 @@ func (o *portfolioResourceType) Entitlements(ctx context.Context, resource *v2.R
 }
 
 func (o *portfolioResourceType) Grants(ctx context.Context, resource *v2.Resource, token *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	portfolioTrait, err := rs.GetGroupTrait(resource)
-	if err != nil {
-		return nil, "", nil, err
-	}
-
-	issuerIDsString, ok := rs.GetProfileStringValue(portfolioTrait.Profile, "portfolio_issuer_ids")
+	issuerIDsString, ok := rs.GetProfileStringValue(rs.GetProfile(resource), "portfolio_issuer_ids")
 	if !ok {
 		return nil, "", nil, fmt.Errorf("error fetching issuer ids from portfolio profile")
 	}

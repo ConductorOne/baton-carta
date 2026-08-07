@@ -27,16 +27,15 @@ func investorResource(ctx context.Context, investor *carta.InvestorFirm, parentR
 		"investor_id": investor.Id,
 	}
 
-	investorTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-		rs.WithStatus(v2.UserTrait_Status_STATUS_UNSPECIFIED),
-	}
+	investorTraitOptions := []rs.UserTraitOption{}
 
 	resource, err := rs.NewUserResource(
 		investor.Name,
 		resourceTypeInvestor,
 		investor.Id,
 		investorTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(v2.Status_RESOURCE_STATUS_UNSPECIFIED, ""),
 		rs.WithParentResourceID(parentResourceID),
 	)
 
